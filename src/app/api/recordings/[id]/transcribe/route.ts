@@ -85,23 +85,23 @@ export async function POST(
             header[2] === 0x67 &&
             header[3] === 0x53; // "OggS"
 
-        const ext = isOgg ? "ogg" : recording.storagePath.split(".").pop() || "mp3";
-        const contentType = isOgg ? "audio/ogg" : recording.storagePath.endsWith(".mp3")
-            ? "audio/mpeg"
-            : "audio/opus";
+        const ext = isOgg
+            ? "ogg"
+            : recording.storagePath.split(".").pop() || "mp3";
+        const contentType = isOgg
+            ? "audio/ogg"
+            : recording.storagePath.endsWith(".mp3")
+              ? "audio/mpeg"
+              : "audio/opus";
 
         // Ensure filename has a valid extension so the API can detect the format
         const filename = recording.filename.match(/\.\w{2,4}$/)
             ? recording.filename
             : `${recording.filename}.${ext}`;
 
-        const audioFile = new File(
-            [new Uint8Array(audioBuffer)],
-            filename,
-            {
-                type: contentType,
-            },
-        );
+        const audioFile = new File([new Uint8Array(audioBuffer)], filename, {
+            type: contentType,
+        });
 
         // Transcribe with verbose JSON to get language detection
         const transcription = await openai.audio.transcriptions.create({
