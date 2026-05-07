@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { recordings, transcriptions, userSettings } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import { decryptText } from "@/lib/encryption/fields";
 import { AppError, apiHandler, ErrorCode } from "@/lib/errors";
 
 // GET - Export recordings in specified format
@@ -52,9 +53,19 @@ export const GET = apiHandler(async (request: Request) => {
                   .where(eq(transcriptions.userId, session.user.id))
             : [];
 
+    // Decrypt content fields up front so each format branch can rely on
+    // plaintext. The export file is the user's plaintext data — they own
+    // it once it leaves the server.
     const transcriptionMap = new Map(
-        userTranscriptions.map((t) => [t.recordingId, t]),
+        userTranscriptions.map((t) => [
+            t.recordingId,
+            { ...t, text: decryptText(t.text) },
+        ]),
     );
+    const decryptedRecordings = userRecordings.map((r) => ({
+        ...r,
+        filename: decryptText(r.filename),
+    }));
 
     // Format export data
     let exportData: string;
@@ -64,7 +75,7 @@ export const GET = apiHandler(async (request: Request) => {
     switch (exportFormat) {
         case "json":
             exportData = JSON.stringify(
-                userRecordings.map((recording) => ({
+                decryptedRecordings.map((recording) => ({
                     id: recording.id,
                     filename: recording.filename,
                     duration: recording.duration,
@@ -81,7 +92,7 @@ export const GET = apiHandler(async (request: Request) => {
             break;
 
         case "txt":
-            exportData = userRecordings
+            exportData = decryptedRecordings
                 .map((recording) => {
                     const transcription = transcriptionMap.get(recording.id);
                     return `${recording.filename}\n${new Date(recording.startTime).toISOString()}\n${transcription?.text || "No transcription"}\n\n---\n\n`;
@@ -93,7 +104,7 @@ export const GET = apiHandler(async (request: Request) => {
 
         case "srt":
             // SRT format for subtitles
-            exportData = userRecordings
+            exportData = decryptedRecordings
                 .map((recording, index) => {
                     const transcription = transcriptionMap.get(recording.id);
                     if (!transcription?.text) return "";
@@ -130,7 +141,7 @@ export const GET = apiHandler(async (request: Request) => {
 
         case "vtt":
             // WebVTT format
-            exportData = `WEBVTT\n\n${userRecordings
+            exportData = `WEBVTT\n\n${decryptedRecordings
                 .map((recording) => {
                     const transcription = transcriptionMap.get(recording.id);
                     if (!transcription?.text) return "";

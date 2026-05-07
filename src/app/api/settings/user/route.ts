@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { userSettings } from "@/db/schema";
 import { normalizeAiOutputLanguage } from "@/lib/ai/summary-presets";
 import { auth } from "@/lib/auth";
+import { decryptJsonField, encryptJsonField } from "@/lib/encryption/fields";
 import { AppError, apiHandler, ErrorCode } from "@/lib/errors";
 
 // Default settings values
@@ -117,11 +118,14 @@ export const GET = apiHandler(async (request: Request) => {
     }
 
     const settingsData = extractSettings(settings);
+    // jsonb-envelope encrypted at rest; legacy plaintext rows pass through.
     if (settings.titleGenerationPrompt) {
-        settingsData.titleGenerationPrompt = settings.titleGenerationPrompt;
+        settingsData.titleGenerationPrompt = decryptJsonField(
+            settings.titleGenerationPrompt,
+        );
     }
     if (settings.summaryPrompt) {
-        settingsData.summaryPrompt = settings.summaryPrompt;
+        settingsData.summaryPrompt = decryptJsonField(settings.summaryPrompt);
     }
     return NextResponse.json({
         ...settingsData,
@@ -185,18 +189,27 @@ export const PUT = apiHandler(async (request: Request) => {
         }
     }
 
-    // Handle titleGenerationPrompt separately (jsonb field)
+    // Handle titleGenerationPrompt separately (jsonb field). Custom
+    // prompts can carry user-specific context; encrypt at rest.
     if (body.titleGenerationPrompt !== undefined) {
-        updateData.titleGenerationPrompt = body.titleGenerationPrompt;
-        insertData.titleGenerationPrompt = body.titleGenerationPrompt;
+        const encrypted =
+            body.titleGenerationPrompt === null
+                ? null
+                : encryptJsonField(body.titleGenerationPrompt);
+        updateData.titleGenerationPrompt = encrypted;
+        insertData.titleGenerationPrompt = encrypted;
     } else if (!existing) {
         insertData.titleGenerationPrompt = null;
     }
 
-    // Handle summaryPrompt separately (jsonb field)
+    // Handle summaryPrompt separately (jsonb field) — same envelope.
     if (body.summaryPrompt !== undefined) {
-        updateData.summaryPrompt = body.summaryPrompt;
-        insertData.summaryPrompt = body.summaryPrompt;
+        const encrypted =
+            body.summaryPrompt === null
+                ? null
+                : encryptJsonField(body.summaryPrompt);
+        updateData.summaryPrompt = encrypted;
+        insertData.summaryPrompt = encrypted;
     } else if (!existing) {
         insertData.summaryPrompt = null;
     }

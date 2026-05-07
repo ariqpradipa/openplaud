@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { recordings } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import { encryptText } from "@/lib/encryption/fields";
 import { env } from "@/lib/env";
 import { AppError, apiHandler, ErrorCode } from "@/lib/errors";
 import { createUserStorageProvider } from "@/lib/storage/factory";
@@ -133,7 +134,9 @@ export const POST = apiHandler(async (request: Request) => {
             userId: session.user.id,
             deviceSn: "local",
             plaudFileId: fileId,
-            filename: basename,
+            // Filename can carry topic info ("Call w/ Acme legal");
+            // encrypt at rest. The response below returns plaintext.
+            filename: encryptText(basename),
             duration: durationMs,
             startTime: now,
             endTime,

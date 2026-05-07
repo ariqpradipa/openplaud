@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { aiEnhancements, recordings, transcriptions } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import { decryptText } from "@/lib/encryption/fields";
 import { AppError, apiHandler, ErrorCode } from "@/lib/errors";
 import { createUserStorageProvider } from "@/lib/storage/factory";
 
@@ -54,9 +55,17 @@ export const GET = apiHandler<IdContext>(async (request, context) => {
         )
         .limit(1);
 
+    // Decrypt content fields before returning to the client. The DB
+    // holds ciphertext (or, during the deploy → backfill window, legacy
+    // plaintext); the client always sees plaintext.
     return NextResponse.json({
-        recording,
-        transcription: transcription || null,
+        recording: {
+            ...recording,
+            filename: decryptText(recording.filename),
+        },
+        transcription: transcription
+            ? { ...transcription, text: decryptText(transcription.text) }
+            : null,
     });
 });
 

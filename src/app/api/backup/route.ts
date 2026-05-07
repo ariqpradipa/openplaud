@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { recordings, transcriptions } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import { decryptText } from "@/lib/encryption/fields";
 import { AppError, apiHandler, ErrorCode } from "@/lib/errors";
 
 // POST - Create a backup of all user data
@@ -36,8 +37,13 @@ export const POST = apiHandler(async (request: Request) => {
                   .where(eq(transcriptions.userId, session.user.id))
             : [];
 
+    // Decrypt content before serialization — the backup is the user's
+    // plaintext export, which they own off-system from this point.
     const transcriptionMap = new Map(
-        userTranscriptions.map((t) => [t.recordingId, t]),
+        userTranscriptions.map((t) => [
+            t.recordingId,
+            { ...t, text: decryptText(t.text) },
+        ]),
     );
 
     // Create backup data structure
@@ -47,7 +53,7 @@ export const POST = apiHandler(async (request: Request) => {
         userId: session.user.id,
         recordings: userRecordings.map((recording) => ({
             id: recording.id,
-            filename: recording.filename,
+            filename: decryptText(recording.filename),
             duration: recording.duration,
             startTime: recording.startTime,
             endTime: recording.endTime,
