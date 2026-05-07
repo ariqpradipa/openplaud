@@ -33,14 +33,19 @@ export default async function DashboardPage() {
             language: transcriptions.detectedLanguage,
         })
         .from(transcriptions)
-        .where(eq(transcriptions.userId, session.user.id));
+        .where(
+            and(
+                eq(transcriptions.userId, session.user.id),
+                eq(transcriptions.status, "completed"),
+            ),
+        );
 
     const recordingsData = userRecordings.map(serializeRecording);
 
     const transcriptionMap = new Map(
         userTranscriptions.map((t) => [
             t.recordingId,
-            { text: t.text, language: t.language || undefined },
+            { text: t.text || undefined, language: t.language || undefined },
         ]),
     );
 

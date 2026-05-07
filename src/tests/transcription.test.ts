@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
-vi.mock("@/db", () => ({
-    db: {
+vi.mock("@/db", () => {
+    const db: Record<string, unknown> = {
         select: vi.fn(),
         insert: vi.fn(),
         update: vi.fn(),
-    },
-}));
+    };
+    db.transaction = vi.fn().mockImplementation(
+        (cb: (tx: unknown) => Promise<unknown>) => cb(db),
+    );
+    return { db };
+});
 
 vi.mock("@/lib/encryption", () => ({
     decrypt: vi.fn().mockReturnValue("fake-api-key"),
@@ -39,6 +43,9 @@ describe("Transcription", () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        (db.select as Mock).mockReset();
+        (db.update as Mock).mockReset();
+        (db.insert as Mock).mockReset();
     });
 
     describe("transcribeRecording", () => {
@@ -62,18 +69,21 @@ describe("Transcription", () => {
 
         it("should return success when transcription already exists", async () => {
             (db.select as Mock)
+                // transcribeAudio: recording lookup
                 .mockReturnValueOnce({
                     from: vi.fn().mockReturnValue({
                         where: vi.fn().mockReturnValue({
                             limit: vi.fn().mockResolvedValue([
                                 {
                                     id: mockRecordingId,
+                                    userId: mockUserId,
                                     filename: "test.mp3",
                                 },
                             ]),
                         }),
                     }),
                 })
+                // transcribeAudio: transcription lookup (existing text)
                 .mockReturnValueOnce({
                     from: vi.fn().mockReturnValue({
                         where: vi.fn().mockReturnValue({
@@ -84,7 +94,58 @@ describe("Transcription", () => {
                                 ]),
                         }),
                     }),
+                })
+                // transcribeRecording wrapper: credentials lookup (before tx)
+                .mockReturnValueOnce({
+                    from: vi.fn().mockReturnValue({
+                        where: vi.fn().mockReturnValue({
+                            limit: vi.fn().mockResolvedValue([
+                                { provider: "openai", defaultModel: "whisper-1" },
+                            ]),
+                        }),
+                    }),
+                })
+                // transcribeRecording wrapper: transcription lookup (before tx)
+                .mockReturnValueOnce({
+                    from: vi.fn().mockReturnValue({
+                        where: vi.fn().mockReturnValue({
+                            limit: vi
+                                .fn()
+                                .mockResolvedValue([
+                                    { id: "trans-1", text: "Existing text" },
+                                ]),
+                        }),
+                    }),
+                })
+                // Transaction: FOR UPDATE recording check
+                .mockReturnValueOnce({
+                    from: vi.fn().mockReturnValue({
+                        where: vi.fn().mockReturnValue({
+                            limit: vi.fn().mockResolvedValue([
+                                { id: mockRecordingId, deletedAt: null },
+                            ]),
+                        }),
+                    }),
+                })
+                // postProcessTranscription: userSettings lookup
+                .mockReturnValueOnce({
+                    from: vi.fn().mockReturnValue({
+                        where: vi.fn().mockReturnValue({
+                            limit: vi.fn().mockResolvedValue([
+                                {
+                                    autoGenerateTitle: false,
+                                    syncTitleToPlaud: false,
+                                },
+                            ]),
+                        }),
+                    }),
                 });
+
+            (db.update as Mock).mockReturnValue({
+                set: vi.fn().mockReturnValue({
+                    where: vi.fn().mockResolvedValue(undefined),
+                }),
+            });
 
             const result = await transcribeRecording(
                 mockUserId,
@@ -102,10 +163,17 @@ describe("Transcription", () => {
                             limit: vi.fn().mockResolvedValue([
                                 {
                                     id: mockRecordingId,
+                                    userId: mockUserId,
                                     filename: "test.mp3",
-                                    storagePath: "test.mp3",
                                 },
                             ]),
+                        }),
+                    }),
+                })
+                .mockReturnValueOnce({
+                    from: vi.fn().mockReturnValue({
+                        where: vi.fn().mockReturnValue({
+                            limit: vi.fn().mockResolvedValue([]),
                         }),
                     }),
                 })
