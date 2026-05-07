@@ -12,11 +12,6 @@ const RYBBIT_SITE_ID = process.env.RYBBIT_SITE_ID;
 
 const nextConfig: NextConfig = {
     output: "standalone",
-    // Enable instrumentation hook for worker startup/recovery.
-    // The worker runs in-process for self-host; architecture allows
-    // extracting to a dedicated process later (AGENTS.md hosted-mode
-    // invariants). See instrumentation.ts.
-    instrumentationHook: true,
     images: {
         loader: "custom",
         loaderFile: "./loader.ts",

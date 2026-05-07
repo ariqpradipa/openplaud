@@ -343,6 +343,16 @@ async function processJob(job: ClaimedJob): Promise<void> {
         const storage = await createUserStorageProvider(userId);
         const audioBuffer = await storage.downloadFile(recording.storagePath);
 
+        // Detect format from magic bytes (direct Buffer access, no copies)
+        const isOgg =
+            audioBuffer[0] === 0x4f &&
+            audioBuffer[1] === 0x67 &&
+            audioBuffer[2] === 0x67 &&
+            audioBuffer[3] === 0x53;
+        const audioBlob = new Blob([audioBuffer], {
+            type: isOgg ? "audio/ogg" : "audio/mpeg",
+        });
+
         const model = credentials.defaultModel || "whisper-1";
         const responseFormat = getResponseFormat(model);
 
@@ -352,7 +362,7 @@ async function processJob(job: ClaimedJob): Promise<void> {
 
         const transcription = await openai.audio.transcriptions.create(
             {
-                file: audioBuffer,
+                file: audioBlob,
                 model,
                 response_format: responseFormat,
                 ...(defaultLanguage ? { language: defaultLanguage } : {}),
