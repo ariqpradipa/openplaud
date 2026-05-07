@@ -349,7 +349,7 @@ async function processJob(job: ClaimedJob): Promise<void> {
             audioBuffer[1] === 0x67 &&
             audioBuffer[2] === 0x67 &&
             audioBuffer[3] === 0x53;
-        const audioBlob = new Blob([audioBuffer], {
+        const audioBlob = new Blob([audioBuffer as unknown as BlobPart], {
             type: isOgg ? "audio/ogg" : "audio/mpeg",
         });
 
