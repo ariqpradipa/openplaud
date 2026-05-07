@@ -43,6 +43,7 @@ interface TranscriptionPanelProps {
     transcription?: Transcription;
     isTranscribing: boolean;
     onTranscribe: () => void;
+    onCancel?: () => void;
 }
 
 export function TranscriptionPanel({
@@ -50,6 +51,7 @@ export function TranscriptionPanel({
     transcription,
     isTranscribing,
     onTranscribe,
+    onCancel,
 }: TranscriptionPanelProps) {
     const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
     const [isSummarizing, setIsSummarizing] = useState(false);
@@ -177,9 +179,18 @@ export function TranscriptionPanel({
                     {isTranscribing ? (
                         <div className="flex flex-col items-center justify-center py-12">
                             <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mb-4" />
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-sm text-muted-foreground mb-4">
                                 Transcribing audio...
                             </p>
+                            {onCancel && (
+                                <Button
+                                    onClick={onCancel}
+                                    variant="outline"
+                                    size="sm"
+                                >
+                                    Cancel
+                                </Button>
+                            )}
                         </div>
                     ) : transcription?.text ? (
                         <div className="space-y-4">

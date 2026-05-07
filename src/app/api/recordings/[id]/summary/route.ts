@@ -171,10 +171,11 @@ export async function POST(
 
         // Truncate transcription if too long
         const maxLength = 8000;
+        const transcriptionText = transcription.text || "";
         const truncatedTranscription =
-            transcription.text.length > maxLength
-                ? `${transcription.text.substring(0, maxLength)}...`
-                : transcription.text;
+            transcriptionText.length > maxLength
+                ? `${transcriptionText.substring(0, maxLength)}...`
+                : transcriptionText;
 
         // Apply AI output language directive (if configured) via the system
         // message rather than the user prompt. This separates concerns: the

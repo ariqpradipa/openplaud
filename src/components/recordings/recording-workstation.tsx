@@ -2,7 +2,7 @@
 
 import { ArrowLeft, Loader2, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { RecordingPlayer } from "@/components/dashboard/recording-player";
 import { TranscriptionPanel } from "@/components/dashboard/transcription-panel";
@@ -22,6 +22,7 @@ interface Transcription {
     text?: string;
     detectedLanguage?: string;
     transcriptionType?: string;
+    status?: string;
 }
 
 interface RecordingWorkstationProps {
@@ -34,33 +35,112 @@ export function RecordingWorkstation({
     transcription,
 }: RecordingWorkstationProps) {
     const router = useRouter();
+    const [liveTranscription, setLiveTranscription] = useState(transcription);
     const [isTranscribing, setIsTranscribing] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    const startPolling = useCallback(() => {
+        if (pollingRef.current) return;
+        setIsTranscribing(true);
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch(
+                    `/api/recordings/${recording.id}/transcribe`,
+                );
+                if (!res.ok) return;
+                const data = await res.json();
+
+                if (data.status === "completed") {
+                    clearInterval(interval);
+                    pollingRef.current = null;
+                    setIsTranscribing(false);
+                    setLiveTranscription({
+                        text: data.transcription,
+                        detectedLanguage: data.detectedLanguage,
+                        transcriptionType: data.transcriptionType,
+                        status: "completed",
+                    });
+                    toast.success("Transcription complete");
+                    router.refresh();
+                } else if (data.status === "failed") {
+                    clearInterval(interval);
+                    pollingRef.current = null;
+                    setIsTranscribing(false);
+                    toast.error(data.errorMessage || "Transcription failed");
+                }
+            } catch {
+            }
+        }, 3000);
+        pollingRef.current = interval;
+    }, [recording.id, router]);
+
+    useEffect(() => {
+        return () => {
+            if (pollingRef.current) clearInterval(pollingRef.current);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (
+            transcription?.status === "processing" ||
+            transcription?.text === ""
+        ) {
+            const controller = new AbortController();
+            fetch(`/api/recordings/${recording.id}/transcribe`, {
+                signal: controller.signal,
+            })
+                .then((res) => res.json())
+                .then((data) => {
+                    if (data.status === "processing") startPolling();
+                })
+                .catch(() => {});
+            return () => controller.abort();
+        }
+    }, [recording.id]);
 
     const handleTranscribe = useCallback(async () => {
         setIsTranscribing(true);
         try {
             const response = await fetch(
                 `/api/recordings/${recording.id}/transcribe`,
-                {
-                    method: "POST",
-                },
+                { method: "POST" },
             );
 
-            if (response.ok) {
-                toast.success("Transcription complete");
-                router.refresh();
-            } else {
+            if (!response.ok) {
                 const error = await response.json();
                 toast.error(error.error || "Transcription failed");
+                setIsTranscribing(false);
+                return;
+            }
+
+            const data = await response.json();
+            if (data.status === "processing") {
+                toast.info("Transcription started in background");
+                startPolling();
+            } else {
+                setIsTranscribing(false);
+                toast.success("Transcription complete");
+                router.refresh();
             }
         } catch {
             toast.error("Failed to transcribe recording");
-        } finally {
             setIsTranscribing(false);
         }
-    }, [recording.id, router]);
+    }, [recording.id, router, startPolling]);
+
+    const handleCancel = useCallback(async () => {
+        try {
+            await fetch(`/api/recordings/${recording.id}/transcribe`, {
+                method: "DELETE",
+            });
+        } catch {
+        }
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        pollingRef.current = null;
+        setIsTranscribing(false);
+    }, [recording.id]);
 
     const handleDelete = useCallback(async () => {
         setIsDeleting(true);
@@ -121,9 +201,10 @@ export function RecordingWorkstation({
                     <RecordingPlayer recording={recording} />
                     <TranscriptionPanel
                         recording={recording}
-                        transcription={transcription}
+                        transcription={liveTranscription}
                         isTranscribing={isTranscribing}
                         onTranscribe={handleTranscribe}
+                        onCancel={handleCancel}
                     />
 
                     {/* Metadata */}

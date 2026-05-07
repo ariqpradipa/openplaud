@@ -40,7 +40,7 @@ export default async function DashboardPage() {
     const transcriptionMap = new Map(
         userTranscriptions.map((t) => [
             t.recordingId,
-            { text: t.text, language: t.language || undefined },
+            { text: t.text ?? undefined, language: t.language || undefined },
         ]),
     );
 

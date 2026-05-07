@@ -78,14 +78,60 @@ export function TranscriptionSection({
         return () => controller.abort();
     }, [recordingId, summaryFetchKey]);
 
+    const startPolling = useCallback(() => {
+        const interval = setInterval(async () => {
+            try {
+                const response = await fetch(
+                    `/api/recordings/${recordingId}/transcribe`,
+                );
+                if (!response.ok) return;
+                const data = await response.json();
+
+                if (data.status === "completed") {
+                    clearInterval(interval);
+                    setTranscription(data.transcription);
+                    setDetectedLanguage(data.detectedLanguage);
+                    setTranscriptionType(data.transcriptionType || "server");
+                    setIsProcessing(false);
+                    setSummaryData(null);
+                    setSummaryFetchKey((k) => k + 1);
+                    toast.success("Transcription complete");
+                } else if (data.status === "failed") {
+                    clearInterval(interval);
+                    setIsProcessing(false);
+                    toast.error(data.errorMessage || "Transcription failed");
+                }
+            } catch {
+            }
+        }, 3000);
+
+        return () => clearInterval(interval);
+    }, [recordingId]);
+
+    useEffect(() => {
+        if (initialTranscription === "" && transcription === "") {
+            const controller = new AbortController();
+            fetch(`/api/recordings/${recordingId}/transcribe`, {
+                signal: controller.signal,
+            })
+                .then((res) => res.json())
+                .then((data) => {
+                    if (data.status === "processing" && !isProcessing) {
+                        setIsProcessing(true);
+                        startPolling();
+                    }
+                })
+                .catch(() => {});
+            return () => controller.abort();
+        }
+    }, [recordingId]);
+
     const handleTranscribe = async () => {
         setIsProcessing(true);
         try {
             const response = await fetch(
                 `/api/recordings/${recordingId}/transcribe`,
-                {
-                    method: "POST",
-                },
+                { method: "POST" },
             );
 
             if (!response.ok) {
@@ -100,20 +146,25 @@ export function TranscriptionSection({
                 } else {
                     toast.error(errorData.error || "Transcription failed");
                 }
+                setIsProcessing(false);
                 return;
             }
 
             const data = await response.json();
-            setTranscription(data.transcription);
-            setDetectedLanguage(data.detectedLanguage);
-            setTranscriptionType("server");
-            // Invalidate cached summary — it was based on old text
-            setSummaryData(null);
-            setSummaryFetchKey((k) => k + 1);
-            toast.success("Transcription complete");
+            if (data.status === "processing") {
+                toast.info("Transcription started in background");
+                startPolling();
+            } else {
+                setTranscription(data.transcription);
+                setDetectedLanguage(data.detectedLanguage);
+                setTranscriptionType("server");
+                setSummaryData(null);
+                setSummaryFetchKey((k) => k + 1);
+                setIsProcessing(false);
+                toast.success("Transcription complete");
+            }
         } catch {
             toast.error("Transcription failed. Please try again.");
-        } finally {
             setIsProcessing(false);
         }
     };

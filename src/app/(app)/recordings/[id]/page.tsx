@@ -49,10 +49,11 @@ export default async function RecordingDetailPage({
             transcription={
                 transcription
                     ? {
-                          text: transcription.text,
+                          text: transcription.text ?? undefined,
                           detectedLanguage:
                               transcription.detectedLanguage || undefined,
                           transcriptionType: transcription.transcriptionType,
+                          status: transcription.status ?? undefined,
                       }
                     : undefined
             }

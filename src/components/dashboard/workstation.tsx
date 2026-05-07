@@ -34,10 +34,45 @@ interface WorkstationProps {
 
 export function Workstation({ recordings, transcriptions }: WorkstationProps) {
     const router = useRouter();
+
+    const restoreRecording = useCallback((): Recording | null => {
+        const savedId =
+            typeof window !== "undefined"
+                ? localStorage.getItem("openplaud-last-recording")
+                : null;
+        if (savedId) {
+            const found = recordings.find((r) => r.id === savedId);
+            if (found) return found;
+        }
+        return recordings.length > 0 ? recordings[0] : null;
+    }, [recordings]);
+
     const [currentRecording, setCurrentRecording] = useState<Recording | null>(
-        recordings.length > 0 ? recordings[0] : null,
+        restoreRecording,
     );
-    const [isTranscribing, setIsTranscribing] = useState(false);
+
+    const selectRecording = useCallback((recording: Recording | null) => {
+        setCurrentRecording(recording);
+        if (typeof window !== "undefined" && recording?.id) {
+            localStorage.setItem("openplaud-last-recording", recording.id);
+        }
+    }, []);
+
+    const [transcribingIds, setTranscribingIds] = useState<Set<string>>(new Set());
+    const isTranscribing = currentRecording
+        ? transcribingIds.has(currentRecording.id)
+        : false;
+
+    const markTranscribing = useCallback((id: string) => {
+        setTranscribingIds((prev) => new Set(prev).add(id));
+    }, []);
+    const unmarkTranscribing = useCallback((id: string) => {
+        setTranscribingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+        });
+    }, []);
     const [isUploading, setIsUploading] = useState(false);
     const uploadInputRef = useRef<HTMLInputElement>(null);
     const [settingsOpen, setSettingsOpen] = useState(false);
@@ -80,6 +115,51 @@ export function Workstation({ recordings, transcriptions }: WorkstationProps) {
             return updated ?? null;
         });
     }, [recordings]);
+
+    useEffect(() => {
+        if (!currentRecording) return;
+
+        const recordingId = currentRecording.id;
+        const ct = transcriptions.get(recordingId);
+        if (ct?.text === undefined || ct?.text === "") {
+            const controller = new AbortController();
+            fetch(`/api/recordings/${recordingId}/transcribe`, {
+                signal: controller.signal,
+            })
+                .then((res) => res.json())
+                .then((data) => {
+                    if (data.status === "processing") {
+                        markTranscribing(recordingId);
+                        const interval = setInterval(async () => {
+                            try {
+                                const statusRes = await fetch(
+                                    `/api/recordings/${recordingId}/transcribe`,
+                                );
+                                if (!statusRes.ok) return;
+                                const statusData = await statusRes.json();
+
+                                if (statusData.status === "completed") {
+                                    clearInterval(interval);
+                                    unmarkTranscribing(recordingId);
+                                    toast.success("Transcription complete");
+                                    router.refresh();
+                                } else if (statusData.status === "failed") {
+                                    clearInterval(interval);
+                                    unmarkTranscribing(recordingId);
+                                    toast.error(
+                                        statusData.errorMessage ||
+                                            "Transcription failed",
+                                    );
+                                }
+                            } catch {
+                            }
+                        }, 3000);
+                    }
+                })
+                .catch(() => {});
+            return () => controller.abort();
+        }
+    }, [currentRecording?.id]);
 
     useEffect(() => {
         getSyncSettings().then(setSyncSettings);
@@ -167,28 +247,71 @@ export function Workstation({ recordings, transcriptions }: WorkstationProps) {
     const handleTranscribe = useCallback(async () => {
         if (!currentRecording) return;
 
-        setIsTranscribing(true);
+        const recordingId = currentRecording.id;
+        markTranscribing(recordingId);
         try {
             const response = await fetch(
-                `/api/recordings/${currentRecording.id}/transcribe`,
-                {
-                    method: "POST",
-                },
+                `/api/recordings/${recordingId}/transcribe`,
+                { method: "POST" },
             );
 
-            if (response.ok) {
-                toast.success("Transcription complete");
-                router.refresh();
-            } else {
+            if (!response.ok) {
                 const error = await response.json();
                 toast.error(error.error || "Transcription failed");
+                unmarkTranscribing(recordingId);
+                return;
+            }
+
+            const data = await response.json();
+            if (data.status === "processing") {
+                toast.info("Transcription started in background");
+
+                const interval = setInterval(async () => {
+                    try {
+                        const statusRes = await fetch(
+                            `/api/recordings/${recordingId}/transcribe`,
+                        );
+                        if (!statusRes.ok) return;
+                        const statusData = await statusRes.json();
+
+                        if (statusData.status === "completed") {
+                            clearInterval(interval);
+                            unmarkTranscribing(recordingId);
+                            toast.success("Transcription complete");
+                            router.refresh();
+                        } else if (statusData.status === "failed") {
+                            clearInterval(interval);
+                            unmarkTranscribing(recordingId);
+                            toast.error(
+                                statusData.errorMessage ||
+                                    "Transcription failed",
+                            );
+                        }
+                    } catch {
+                    }
+                }, 3000);
+            } else {
+                unmarkTranscribing(recordingId);
+                toast.success("Transcription complete");
+                router.refresh();
             }
         } catch {
             toast.error("Failed to transcribe recording");
-        } finally {
-            setIsTranscribing(false);
+            unmarkTranscribing(recordingId);
         }
-    }, [currentRecording, router]);
+    }, [currentRecording, router, markTranscribing, unmarkTranscribing]);
+
+    const handleCancel = useCallback(async () => {
+        if (!currentRecording) return;
+        try {
+            await fetch(
+                `/api/recordings/${currentRecording.id}/transcribe`,
+                { method: "DELETE" },
+            );
+        } catch {
+        }
+        unmarkTranscribing(currentRecording.id);
+    }, [currentRecording, unmarkTranscribing]);
 
     const handleUpload = useCallback(
         async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -338,7 +461,7 @@ export function Workstation({ recordings, transcriptions }: WorkstationProps) {
                                 <RecordingList
                                     recordings={recordings}
                                     currentRecording={currentRecording}
-                                    onSelect={setCurrentRecording}
+                                    onSelect={selectRecording}
                                 />
                             </div>
 
@@ -359,7 +482,7 @@ export function Workstation({ recordings, transcriptions }: WorkstationProps) {
                                                     currentIndex <
                                                         recordings.length - 1
                                                 ) {
-                                                    setCurrentRecording(
+                                                    selectRecording(
                                                         recordings[
                                                             currentIndex + 1
                                                         ],
@@ -372,6 +495,7 @@ export function Workstation({ recordings, transcriptions }: WorkstationProps) {
                                             transcription={currentTranscription}
                                             isTranscribing={isTranscribing}
                                             onTranscribe={handleTranscribe}
+                                            onCancel={handleCancel}
                                         />
                                     </>
                                 ) : (
