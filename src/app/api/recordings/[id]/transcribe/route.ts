@@ -10,6 +10,7 @@ import {
     getResponseFormat,
     parseTranscriptionResponse,
 } from "@/lib/transcription/format";
+import { transcribeWithWhisperX } from "@/lib/transcription/providers/nyaralei-whisperx";
 
 export async function POST(
     request: Request,
@@ -124,16 +125,38 @@ export async function POST(
         });
 
         const model = overrideModel || credentials.defaultModel || "whisper-1";
-        const responseFormat = getResponseFormat(model);
+        const isWhisperX = credentials.provider === "Nyaralei WhisperX";
 
-        const transcription = await openai.audio.transcriptions.create({
-            file: audioFile,
-            model,
-            response_format: responseFormat,
-        });
+        let transcriptionText: string;
+        let detectedLanguage: string | null = null;
+        let diarizedSegments = null;
 
-        const { text: transcriptionText, detectedLanguage } =
-            parseTranscriptionResponse(transcription, responseFormat);
+        if (isWhisperX) {
+            const result = await transcribeWithWhisperX(
+                credentials.apiKey,
+                credentials.baseUrl || "",
+                model,
+                audioFile,
+            );
+            transcriptionText = result.text;
+            detectedLanguage = result.detectedLanguage;
+            diarizedSegments = result.diarizedSegments;
+        } else {
+            const responseFormat = getResponseFormat(model);
+
+            const transcription = await openai.audio.transcriptions.create({
+                file: audioFile,
+                model,
+                response_format: responseFormat,
+            });
+
+            const parsed = parseTranscriptionResponse(
+                transcription,
+                responseFormat,
+            );
+            transcriptionText = parsed.text;
+            detectedLanguage = parsed.detectedLanguage;
+        }
 
         // Atomic tombstone re-check + transcription upsert.
         //
@@ -181,6 +204,7 @@ export async function POST(
                             transcriptionType: "server",
                             provider: credentials.provider,
                             model,
+                            diarizedSegments,
                         })
                         .where(eq(transcriptions.id, existingTranscription.id));
                 } else {
@@ -192,6 +216,7 @@ export async function POST(
                         transcriptionType: "server",
                         provider: credentials.provider,
                         model,
+                        diarizedSegments,
                     });
                 }
             });
@@ -208,6 +233,7 @@ export async function POST(
         return NextResponse.json({
             transcription: transcriptionText,
             detectedLanguage,
+            diarizedSegments,
         });
     } catch (error) {
         console.error("Error transcribing:", error);

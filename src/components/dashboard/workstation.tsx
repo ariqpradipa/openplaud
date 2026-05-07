@@ -25,6 +25,7 @@ import { TranscriptionPanel } from "./transcription-panel";
 interface TranscriptionData {
     text?: string;
     language?: string;
+    diarizedSegments?: unknown;
 }
 
 interface WorkstationProps {

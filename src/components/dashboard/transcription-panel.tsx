@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { DiarizedTranscript } from "@/components/diarized-transcript";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -28,6 +29,7 @@ import type { Recording } from "@/types/recording";
 interface Transcription {
     text?: string;
     language?: string;
+    diarizedSegments?: unknown;
 }
 
 interface SummaryData {
@@ -184,9 +186,22 @@ export function TranscriptionPanel({
                     ) : transcription?.text ? (
                         <div className="space-y-4">
                             <div className="bg-muted rounded-lg p-4 max-h-96 overflow-y-auto">
-                                <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                                    {transcription.text}
-                                </p>
+                                {Array.isArray(
+                                    transcription.diarizedSegments,
+                                ) &&
+                                transcription.diarizedSegments.length > 0 ? (
+                                    <DiarizedTranscript
+                                        segments={
+                                            transcription.diarizedSegments as Parameters<
+                                                typeof DiarizedTranscript
+                                            >[0]["segments"]
+                                        }
+                                    />
+                                ) : (
+                                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                                        {transcription.text}
+                                    </p>
+                                )}
                             </div>
                             <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2 border-t">
                                 {transcription.language && (

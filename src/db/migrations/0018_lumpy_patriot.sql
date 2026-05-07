@@ -1,0 +1,1 @@
+ALTER TABLE "transcriptions" ADD COLUMN "diarized_segments" jsonb;

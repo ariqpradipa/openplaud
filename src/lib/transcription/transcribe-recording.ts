@@ -16,6 +16,7 @@ import {
     getResponseFormat,
     parseTranscriptionResponse,
 } from "@/lib/transcription/format";
+import { transcribeWithWhisperX } from "@/lib/transcription/providers/nyaralei-whisperx";
 
 export async function transcribeRecording(
     userId: string,
@@ -104,17 +105,39 @@ export async function transcribeRecording(
 
         const model = credentials.defaultModel || "whisper-1";
 
-        const responseFormat = getResponseFormat(model);
+        const isWhisperX = credentials.provider === "Nyaralei WhisperX";
 
-        const transcription = await openai.audio.transcriptions.create({
-            file: audioFile,
-            model,
-            response_format: responseFormat,
-            ...(defaultLanguage ? { language: defaultLanguage } : {}),
-        });
+        let transcriptionText: string;
+        let detectedLanguage: string | null = null;
+        let diarizedSegments = null;
 
-        const { text: transcriptionText, detectedLanguage } =
-            parseTranscriptionResponse(transcription, responseFormat);
+        if (isWhisperX) {
+            const result = await transcribeWithWhisperX(
+                credentials.apiKey,
+                credentials.baseUrl || "",
+                model,
+                audioFile,
+            );
+            transcriptionText = result.text;
+            detectedLanguage = result.detectedLanguage;
+            diarizedSegments = result.diarizedSegments;
+        } else {
+            const responseFormat = getResponseFormat(model);
+
+            const transcription = await openai.audio.transcriptions.create({
+                file: audioFile,
+                model,
+                response_format: responseFormat,
+                ...(defaultLanguage ? { language: defaultLanguage } : {}),
+            });
+
+            const parsed = parseTranscriptionResponse(
+                transcription,
+                responseFormat,
+            );
+            transcriptionText = parsed.text;
+            detectedLanguage = parsed.detectedLanguage;
+        }
 
         // Re-check tombstone after the provider call. The user may have
         // deleted the recording while we were waiting on the transcription
@@ -146,6 +169,7 @@ export async function transcribeRecording(
                     transcriptionType: "server",
                     provider: credentials.provider,
                     model: credentials.defaultModel || "whisper-1",
+                    diarizedSegments,
                 })
                 .where(eq(transcriptions.id, existingTranscription.id));
         } else {
@@ -157,6 +181,7 @@ export async function transcribeRecording(
                 transcriptionType: "server",
                 provider: credentials.provider,
                 model: credentials.defaultModel || "whisper-1",
+                diarizedSegments,
             });
         }
 

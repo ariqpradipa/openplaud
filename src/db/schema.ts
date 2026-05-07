@@ -195,6 +195,10 @@ export const transcriptions = pgTable(
             .default("server"), // 'server' or 'browser'
         provider: varchar("provider", { length: 100 }).notNull(), // e.g., 'openai', 'groq', 'browser'
         model: varchar("model", { length: 100 }).notNull(), // e.g., 'whisper-1', 'whisper-large-v3-turbo', 'whisper-base'
+        // Structured diarized segments (WhisperX, diarized models).
+        // Each segment: { speaker, text, start, end, words?: [...] }
+        // Null for non-diarized or legacy transcriptions.
+        diarizedSegments: jsonb("diarized_segments"),
         createdAt: timestamp("created_at").notNull().defaultNow(),
     },
     (table) => ({

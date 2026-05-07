@@ -22,6 +22,7 @@ interface Transcription {
     text?: string;
     detectedLanguage?: string;
     transcriptionType?: string;
+    diarizedSegments?: unknown;
 }
 
 interface RecordingWorkstationProps {

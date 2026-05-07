@@ -31,6 +31,7 @@ export default async function DashboardPage() {
             recordingId: transcriptions.recordingId,
             text: transcriptions.text,
             language: transcriptions.detectedLanguage,
+            diarizedSegments: transcriptions.diarizedSegments,
         })
         .from(transcriptions)
         .where(eq(transcriptions.userId, session.user.id));
@@ -40,7 +41,11 @@ export default async function DashboardPage() {
     const transcriptionMap = new Map(
         userTranscriptions.map((t) => [
             t.recordingId,
-            { text: t.text, language: t.language || undefined },
+            {
+                text: t.text,
+                language: t.language || undefined,
+                diarizedSegments: t.diarizedSegments || undefined,
+            },
         ]),
     );
 

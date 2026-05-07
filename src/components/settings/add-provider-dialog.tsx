@@ -69,6 +69,12 @@ const providerPresets = [
         placeholder: "Your API key",
         defaultModel: "",
     },
+    {
+        name: "Nyaralei WhisperX",
+        baseUrl: "",
+        placeholder: "Your WhisperX API key",
+        defaultModel: "large-v3",
+    },
 ];
 
 export function AddProviderDialog({

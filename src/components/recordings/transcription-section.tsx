@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import type { DiarizedSegment } from "@/components/diarized-transcript";
+import { DiarizedTranscript } from "@/components/diarized-transcript";
 import { LEDIndicator } from "@/components/led-indicator";
 import { MetalButton } from "@/components/metal-button";
 import { Panel } from "@/components/panel";
@@ -36,6 +38,7 @@ interface TranscriptionSectionProps {
     initialTranscription?: string;
     initialLanguage?: string | null;
     initialType?: string | null;
+    initialDiarizedSegments?: DiarizedSegment[] | null;
 }
 
 export function TranscriptionSection({
@@ -43,11 +46,15 @@ export function TranscriptionSection({
     initialTranscription,
     initialLanguage,
     initialType,
+    initialDiarizedSegments,
 }: TranscriptionSectionProps) {
     const [transcription, setTranscription] = useState(initialTranscription);
     const [detectedLanguage, setDetectedLanguage] = useState(initialLanguage);
     const [transcriptionType, setTranscriptionType] = useState(initialType);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [diarizedSegments, setDiarizedSegments] = useState<
+        DiarizedSegment[] | null | undefined
+    >(initialDiarizedSegments);
 
     // Summary state
     const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
@@ -106,6 +113,7 @@ export function TranscriptionSection({
             const data = await response.json();
             setTranscription(data.transcription);
             setDetectedLanguage(data.detectedLanguage);
+            setDiarizedSegments(data.diarizedSegments ?? null);
             setTranscriptionType("server");
             // Invalidate cached summary — it was based on old text
             setSummaryData(null);
@@ -213,9 +221,15 @@ export function TranscriptionSection({
 
                     {transcription ? (
                         <div className="info-card">
-                            <p className="whitespace-pre-wrap leading-relaxed">
-                                {transcription}
-                            </p>
+                            {diarizedSegments && diarizedSegments.length > 0 ? (
+                                <DiarizedTranscript
+                                    segments={diarizedSegments}
+                                />
+                            ) : (
+                                <p className="whitespace-pre-wrap leading-relaxed">
+                                    {transcription}
+                                </p>
+                            )}
                         </div>
                     ) : (
                         <Panel variant="inset" className="text-center py-12">

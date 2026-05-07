@@ -53,6 +53,8 @@ export default async function RecordingDetailPage({
                           detectedLanguage:
                               transcription.detectedLanguage || undefined,
                           transcriptionType: transcription.transcriptionType,
+                          diarizedSegments:
+                              transcription.diarizedSegments || undefined,
                       }
                     : undefined
             }
