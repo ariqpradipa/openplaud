@@ -109,10 +109,10 @@ export async function transcribeWithWhisperX(
 
     const formData = new FormData();
     formData.append("file", audioFile);
-    formData.append("model", model || "whisper-1");
     formData.append("response_format", "verbose_json");
     formData.append("diarize", "true");
     formData.append("align", "true");
+    formData.append("model", model && model !== "whisper-1" ? model : "large-v3");
 
     const response = await fetch(`${base}/v1/audio/transcriptions`, {
         method: "POST",
