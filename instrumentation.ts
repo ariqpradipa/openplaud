@@ -8,15 +8,13 @@
  * invariants).
  */
 export async function register() {
-    if (process.env.NEXT_RUNTIME === "nodejs") {
-        const { startWorker, runStartupRecovery } = await import(
-            "@/lib/transcription/worker"
-        );
+    const { startWorker, runStartupRecovery } = await import(
+        "@/lib/transcription/worker"
+    );
 
-        console.log("[Instrumentation] Running startup recovery sweep...");
-        await runStartupRecovery();
+    console.log("[Instrumentation] Running startup recovery sweep...");
+    await runStartupRecovery();
 
-        console.log("[Instrumentation] Starting transcription worker...");
-        startWorker();
-    }
+    console.log("[Instrumentation] Starting transcription worker...");
+    startWorker();
 }

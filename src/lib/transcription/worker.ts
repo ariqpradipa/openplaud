@@ -1,4 +1,4 @@
-import { and, eq, lt, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { OpenAI } from "openai";
 import { db } from "@/db";
 import {
@@ -180,31 +180,42 @@ async function tick(): Promise<void> {
  */
 async function claimJob(): Promise<ClaimedJob | null> {
     return db.transaction(async (tx) => {
-        const result = await tx.execute(
-            sql`
-                SELECT t.id, t.recording_id, t.user_id
-                FROM transcriptions t
-                JOIN recordings r ON t.recording_id = r.id
-                WHERE (
-                    t.status = 'pending'
-                    OR (t.status = 'failed' AND t.retry_count < ${env.TRANSCRIPTION_MAX_RETRIES})
-                )
-                AND t.locked_at IS NULL
-                AND r.deleted_at IS NULL
-                ORDER BY t.created_at ASC
-                LIMIT 1
-                FOR UPDATE SKIP LOCKED
-            `,
-        );
+        const rows = await tx
+            .select({
+                id: transcriptions.id,
+                recordingId: transcriptions.recordingId,
+                userId: transcriptions.userId,
+            })
+            .from(transcriptions)
+            .innerJoin(
+                recordings,
+                and(
+                    eq(transcriptions.recordingId, recordings.id),
+                    isNull(recordings.deletedAt),
+                ),
+            )
+            .where(
+                and(
+                    isNull(transcriptions.lockedAt),
+                    or(
+                        eq(transcriptions.status, "pending"),
+                        and(
+                            eq(transcriptions.status, "failed"),
+                            lt(
+                                transcriptions.retryCount,
+                                env.TRANSCRIPTION_MAX_RETRIES,
+                            ),
+                        ),
+                    ),
+                ),
+            )
+            .orderBy(asc(transcriptions.createdAt))
+            .limit(1)
+            .for("update", { skipLocked: true });
 
-        const rows = (result as unknown as { rows: Record<string, unknown>[] }).rows;
         if (rows.length === 0) return null;
 
-        const raw = rows[0] as {
-            id: string;
-            recording_id: string;
-            user_id: string;
-        };
+        const job = rows[0];
 
         // Per-user concurrency cap — count processing rows for this user.
         // The row we locked is still pending/failed so it won't inflate the
@@ -214,7 +225,7 @@ async function claimJob(): Promise<ClaimedJob | null> {
             .from(transcriptions)
             .where(
                 and(
-                    eq(transcriptions.userId, raw.user_id),
+                    eq(transcriptions.userId, job.userId),
                     eq(transcriptions.status, "processing"),
                 ),
             );
@@ -231,16 +242,24 @@ async function claimJob(): Promise<ClaimedJob | null> {
         await tx
             .update(transcriptions)
             .set({ status: "processing", lockedAt: new Date() })
-            .where(eq(transcriptions.id, raw.id));
+            .where(
+                and(
+                    eq(transcriptions.id, job.id),
+                    or(
+                        eq(transcriptions.status, "pending"),
+                        eq(transcriptions.status, "failed"),
+                    ),
+                ),
+            );
 
         console.log(
-            `[TranscriptionWorker] Claimed job ${raw.id} → recording ${raw.recording_id} (user ${raw.user_id})`,
+            `[TranscriptionWorker] Claimed job ${job.id} → recording ${job.recordingId} (user ${job.userId})`,
         );
 
         return {
-            transcriptionId: raw.id,
-            recordingId: raw.recording_id,
-            userId: raw.user_id,
+            transcriptionId: job.id,
+            recordingId: job.recordingId,
+            userId: job.userId,
         };
     });
 }
@@ -352,19 +371,22 @@ async function processJob(job: ClaimedJob): Promise<void> {
 
         let wrote = false;
         await db.transaction(async (tx) => {
-            const lockResult = await tx.execute(
-                sql`
-                    SELECT 1
-                    FROM recordings
-                    WHERE id = ${recordingId}
-                      AND user_id = ${userId}
-                      AND deleted_at IS NULL
-                    FOR UPDATE
-                `,
-            );
+            // FOR UPDATE lock on the recording row to serialize with
+            // concurrent DELETE (PR #72 pattern).
+            const [active] = await tx
+                .select({ id: recordings.id })
+                .from(recordings)
+                .where(
+                    and(
+                        eq(recordings.id, recordingId),
+                        eq(recordings.userId, userId),
+                        isNull(recordings.deletedAt),
+                    ),
+                )
+                .for("update")
+                .limit(1);
 
-            const lockRows = (lockResult as unknown as { rows: Record<string, unknown>[] }).rows;
-            if (lockRows.length === 0) {
+            if (!active) {
                 console.log(
                     `[TranscriptionWorker] Recording ${recordingId} tombstoned — discarding result`,
                 );
