@@ -115,11 +115,7 @@ export async function POST(
               ? "audio/mpeg"
               : "audio/opus";
 
-        // Ensure filename has a valid extension so the API can detect the format
-        const rawFilename = recording.filename.match(/\.\w{2,4}$/)
-            ? recording.filename
-            : `${recording.filename}.${ext}`;
-        const filename = rawFilename.replace(/\s+/g, "-");
+        const filename = `${id}.${ext}`;
 
         const audioFile = new File([new Uint8Array(audioBuffer)], filename, {
             type: contentType,
