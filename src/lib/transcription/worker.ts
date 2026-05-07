@@ -343,21 +343,6 @@ async function processJob(job: ClaimedJob): Promise<void> {
         const storage = await createUserStorageProvider(userId);
         const audioBuffer = await storage.downloadFile(recording.storagePath);
 
-        // Detect audio format from magic bytes rather than file extension.
-        // Plaud recordings arrive as OGG Opus or MP3.
-        const header = new Uint8Array(audioBuffer.slice(0, 4));
-        const isOgg =
-            header[0] === 0x4f &&
-            header[1] === 0x67 &&
-            header[2] === 0x67 &&
-            header[3] === 0x53;
-        const contentType = isOgg ? "audio/ogg" : "audio/mpeg";
-        const audioFile = new File(
-            [new Uint8Array(audioBuffer)],
-            recording.filename,
-            { type: contentType },
-        );
-
         const model = credentials.defaultModel || "whisper-1";
         const responseFormat = getResponseFormat(model);
 
@@ -367,7 +352,7 @@ async function processJob(job: ClaimedJob): Promise<void> {
 
         const transcription = await openai.audio.transcriptions.create(
             {
-                file: audioFile,
+                file: audioBuffer,
                 model,
                 response_format: responseFormat,
                 ...(defaultLanguage ? { language: defaultLanguage } : {}),
