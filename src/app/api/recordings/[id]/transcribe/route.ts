@@ -69,6 +69,10 @@ export async function POST(
                 })
                 .where(eq(transcriptions.recordingId, id));
 
+            import("@/lib/transcription/worker").then(
+                ({ ensureWorkerStarted }) => ensureWorkerStarted(),
+            );
+
             return NextResponse.json({ status: "pending" });
         }
 
@@ -80,6 +84,12 @@ export async function POST(
             provider: "",
             model: "",
         });
+
+        // Start the background worker if it's not already running
+        // (belt-and-suspenders with instrumentation.ts).
+        import("@/lib/transcription/worker").then(
+            ({ ensureWorkerStarted }) => ensureWorkerStarted(),
+        );
 
         return NextResponse.json({ status: "pending" }, { status: 202 });
     } catch (error) {

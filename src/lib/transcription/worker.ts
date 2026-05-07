@@ -60,6 +60,27 @@ export function startWorker(): void {
 }
 
 /**
+ * Ensure the worker is running. Safe to call from any context (route
+ * handler, instrumentation, etc). Redundant calls are no-ops.
+ *
+ * This is the primary mechanism for starting the worker in case the
+ * instrumentation hook doesn't fire (e.g. during dev).
+ */
+let workerStarted = false;
+export function ensureWorkerStarted(): void {
+    if (workerStarted) return;
+    workerStarted = true;
+
+    console.log("[TranscriptionWorker] Ensuring worker is started...");
+    runStartupRecovery()
+        .then(() => startWorker())
+        .catch((err) => {
+            console.error("[TranscriptionWorker] Failed to start:", err);
+            workerStarted = false;
+        });
+}
+
+/**
  * Stop the background transcription worker (graceful shutdown).
  */
 export function stopWorker(): void {
