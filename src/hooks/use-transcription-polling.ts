@@ -195,12 +195,10 @@ export function useTranscriptionPolling(
                     case "completed":
                         setStatus("completed");
                         setTranscriptionText(data.text);
-                        onCompletedRef.current?.(data);
                         break;
                     case "failed":
                         setStatus("failed");
                         setErrorMessage(data.errorMessage);
-                        onFailedRef.current?.(data);
                         break;
                     // null or "cancelled" — leave state as reset
                 }
