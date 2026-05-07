@@ -118,24 +118,6 @@ export function TranscriptionSection({
         }
     }, [recordingId, startPolling]);
 
-    useEffect(() => {
-        if (initialTranscription === "" && transcription === "") {
-            const controller = new AbortController();
-            fetch(`/api/recordings/${recordingId}/transcribe`, {
-                signal: controller.signal,
-            })
-                .then((res) => res.json())
-                .then((data) => {
-                    if (data.status === "processing" && !isProcessing) {
-                        setIsProcessing(true);
-                        startPolling();
-                    }
-                })
-                .catch(() => {});
-            return () => controller.abort();
-        }
-    }, [recordingId]);
-
     const handleTranscribe = async () => {
         setIsProcessing(true);
         try {
