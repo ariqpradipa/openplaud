@@ -12,7 +12,7 @@ export interface WhisperXSegment {
     start: number;
     end: number;
     text: string;
-    speaker: string;
+    speaker?: string;
     words?: WhisperXWord[];
     avg_logprob?: number;
 }
@@ -40,7 +40,8 @@ export interface TranscribeWhisperXResult {
     diarizedSegments: DiarizedTranscriptSegment[] | null;
 }
 
-function formatSpeakerLabel(speaker: string): string {
+function formatSpeakerLabel(speaker: string | undefined): string {
+    if (!speaker) return "Unknown Speaker";
     const match = speaker.match(/SPEAKER_(\d+)/);
     if (match) {
         const num = parseInt(match[1], 10);
