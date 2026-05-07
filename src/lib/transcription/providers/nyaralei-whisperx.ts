@@ -20,8 +20,10 @@ export interface WhisperXSegment {
 export interface WhisperXResponse {
     text: string;
     language: string;
-    segments: WhisperXSegment[];
-    word_segments?: WhisperXWord[];
+    segments: {
+        segments: WhisperXSegment[];
+        word_segments?: WhisperXWord[];
+    };
 }
 
 export interface DiarizedTranscriptSegment {
@@ -128,7 +130,7 @@ export async function transcribeWithWhisperX(
 
     const data = (await response.json()) as WhisperXResponse;
 
-    const merged = mergeConsecutiveSpeakerSegments(data.segments);
+    const merged = mergeConsecutiveSpeakerSegments(data.segments.segments);
     const text = buildDiarizedText(merged);
 
     return {
