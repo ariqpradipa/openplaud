@@ -123,6 +123,8 @@ export function Workstation({ recordings, transcriptions }: WorkstationProps) {
         const ct = transcriptions.get(recordingId);
         if (ct?.text === undefined || ct?.text === "") {
             const controller = new AbortController();
+            let interval: ReturnType<typeof setInterval> | null = null;
+
             fetch(`/api/recordings/${recordingId}/transcribe`, {
                 signal: controller.signal,
             })
@@ -130,7 +132,7 @@ export function Workstation({ recordings, transcriptions }: WorkstationProps) {
                 .then((data) => {
                     if (data.status === "processing") {
                         markTranscribing(recordingId);
-                        const interval = setInterval(async () => {
+                        interval = setInterval(async () => {
                             try {
                                 const statusRes = await fetch(
                                     `/api/recordings/${recordingId}/transcribe`,
@@ -139,12 +141,12 @@ export function Workstation({ recordings, transcriptions }: WorkstationProps) {
                                 const statusData = await statusRes.json();
 
                                 if (statusData.status === "completed") {
-                                    clearInterval(interval);
+                                    if (interval) clearInterval(interval);
                                     unmarkTranscribing(recordingId);
                                     toast.success("Transcription complete");
                                     router.refresh();
                                 } else if (statusData.status === "failed") {
-                                    clearInterval(interval);
+                                    if (interval) clearInterval(interval);
                                     unmarkTranscribing(recordingId);
                                     toast.error(
                                         statusData.errorMessage ||
@@ -157,7 +159,11 @@ export function Workstation({ recordings, transcriptions }: WorkstationProps) {
                     }
                 })
                 .catch(() => {});
-            return () => controller.abort();
+
+            return () => {
+                controller.abort();
+                if (interval) clearInterval(interval);
+            };
         }
     }, [currentRecording?.id]);
 
@@ -304,13 +310,13 @@ export function Workstation({ recordings, transcriptions }: WorkstationProps) {
     const handleCancel = useCallback(async () => {
         if (!currentRecording) return;
         try {
-            await fetch(
+            const res = await fetch(
                 `/api/recordings/${currentRecording.id}/transcribe`,
                 { method: "DELETE" },
             );
+            if (res.ok) unmarkTranscribing(currentRecording.id);
         } catch {
         }
-        unmarkTranscribing(currentRecording.id);
     }, [currentRecording, unmarkTranscribing]);
 
     const handleUpload = useCallback(

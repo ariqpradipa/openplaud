@@ -9,7 +9,7 @@ import {
     Sparkles,
     Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { LEDIndicator } from "@/components/led-indicator";
 import { MetalButton } from "@/components/metal-button";
@@ -48,37 +48,25 @@ export function TranscriptionSection({
     const [detectedLanguage, setDetectedLanguage] = useState(initialLanguage);
     const [transcriptionType, setTranscriptionType] = useState(initialType);
     const [isProcessing, setIsProcessing] = useState(false);
+    const isProcessingRef = useRef(false);
+    const pollingCleanupRef = useRef<(() => void) | null>(null);
 
-    // Summary state
-    const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
-    const [isSummarizing, setIsSummarizing] = useState(false);
-    const [summaryExpanded, setSummaryExpanded] = useState(true);
-    const [summaryPreset, setSummaryPreset] = useState("general");
+    const clearPolling = useCallback(() => {
+        if (pollingCleanupRef.current) {
+            pollingCleanupRef.current();
+            pollingCleanupRef.current = null;
+        }
+    }, []);
 
-    // Key to force re-fetch summary (e.g. after re-transcription)
-    const [summaryFetchKey, setSummaryFetchKey] = useState(0);
-
-    // Fetch existing summary on mount / after re-transcribe
-    // biome-ignore lint/correctness/useExhaustiveDependencies: summaryFetchKey is an intentional re-fetch trigger
     useEffect(() => {
-        const controller = new AbortController();
-        fetch(`/api/recordings/${recordingId}/summary`, {
-            signal: controller.signal,
-        })
-            .then((res) => res.json())
-            .then((data) => {
-                if (data.summary) {
-                    setSummaryData(data);
-                } else {
-                    setSummaryData(null);
-                }
-            })
-            .catch(() => {});
-
-        return () => controller.abort();
-    }, [recordingId, summaryFetchKey]);
+        return () => clearPolling();
+    }, [clearPolling]);
 
     const startPolling = useCallback(() => {
+        clearPolling();
+        isProcessingRef.current = true;
+        setIsProcessing(true);
+
         const interval = setInterval(async () => {
             try {
                 const response = await fetch(
@@ -88,25 +76,47 @@ export function TranscriptionSection({
                 const data = await response.json();
 
                 if (data.status === "completed") {
-                    clearInterval(interval);
+                    clearPolling();
                     setTranscription(data.transcription);
                     setDetectedLanguage(data.detectedLanguage);
                     setTranscriptionType(data.transcriptionType || "server");
                     setIsProcessing(false);
+                    isProcessingRef.current = false;
                     setSummaryData(null);
                     setSummaryFetchKey((k) => k + 1);
                     toast.success("Transcription complete");
                 } else if (data.status === "failed") {
-                    clearInterval(interval);
+                    clearPolling();
                     setIsProcessing(false);
+                    isProcessingRef.current = false;
                     toast.error(data.errorMessage || "Transcription failed");
                 }
             } catch {
             }
         }, 3000);
 
-        return () => clearInterval(interval);
-    }, [recordingId]);
+        pollingCleanupRef.current = () => clearInterval(interval);
+    }, [recordingId, clearPolling]);
+
+    useEffect(() => {
+        if (initialTranscription === "" && transcription === "") {
+            const controller = new AbortController();
+            fetch(`/api/recordings/${recordingId}/transcribe`, {
+                signal: controller.signal,
+            })
+                .then((res) => res.json())
+                .then((data) => {
+                    if (
+                        data.status === "processing" &&
+                        !isProcessingRef.current
+                    ) {
+                        startPolling();
+                    }
+                })
+                .catch(() => {});
+            return () => controller.abort();
+        }
+    }, [recordingId, startPolling]);
 
     useEffect(() => {
         if (initialTranscription === "" && transcription === "") {

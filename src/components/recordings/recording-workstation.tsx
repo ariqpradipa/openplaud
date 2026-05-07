@@ -41,6 +41,10 @@ export function RecordingWorkstation({
     const [isDeleting, setIsDeleting] = useState(false);
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+    useEffect(() => {
+        setLiveTranscription(transcription);
+    }, [transcription]);
+
     const startPolling = useCallback(() => {
         if (pollingRef.current) return;
         setIsTranscribing(true);
@@ -132,10 +136,13 @@ export function RecordingWorkstation({
 
     const handleCancel = useCallback(async () => {
         try {
-            await fetch(`/api/recordings/${recording.id}/transcribe`, {
-                method: "DELETE",
-            });
+            const res = await fetch(
+                `/api/recordings/${recording.id}/transcribe`,
+                { method: "DELETE" },
+            );
+            if (!res.ok) return;
         } catch {
+            return;
         }
         if (pollingRef.current) clearInterval(pollingRef.current);
         pollingRef.current = null;
