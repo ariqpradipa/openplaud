@@ -432,6 +432,7 @@ async function processJob(job: ClaimedJob): Promise<void> {
                     model,
                     status: "completed",
                     lockedAt: null,
+                    createdAt: new Date(),
                 })
                 .where(eq(transcriptions.id, transcriptionId));
 

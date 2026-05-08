@@ -350,6 +350,7 @@ export async function transcribeRecording(
                         status: "completed",
                         provider: credentials?.provider,
                         model: credentials?.defaultModel || "whisper-1",
+                        createdAt: new Date(),
                     })
                     .where(eq(transcriptions.id, existingTranscription.id));
             } else {

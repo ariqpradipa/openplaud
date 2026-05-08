@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { recordings, transcriptions } from "@/db/schema";
@@ -13,6 +13,18 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Accept optional ?since=ISO for time-based filtering.
+    // Default: last 60s to catch recent completions on first poll.
+    const url = new URL(request.url);
+    const sinceParam = url.searchParams.get("since");
+    const since = sinceParam ? new Date(sinceParam) : new Date(Date.now() - 60000);
+
+    const conditions = [
+        eq(transcriptions.userId, session.user.id),
+        eq(transcriptions.status, "completed"),
+        gt(transcriptions.createdAt, since),
+    ];
+
     const rows = await db
         .select({
             transcriptionId: transcriptions.id,
@@ -25,12 +37,7 @@ export async function GET(request: Request) {
             recordings,
             eq(transcriptions.recordingId, recordings.id),
         )
-        .where(
-            and(
-                eq(transcriptions.userId, session.user.id),
-                eq(transcriptions.status, "completed"),
-            ),
-        );
+        .where(and(...conditions));
 
     return NextResponse.json({
         events: rows.map((r) => ({
