@@ -88,6 +88,8 @@ export function SummaryTabs({ recordingId, fetchKey = 0 }: SummaryTabsProps) {
     // biome-ignore lint/correctness/useExhaustiveDependencies: fetchKey is an intentional re-fetch signal passed from parent
     useEffect(() => {
         setIsLoading(true);
+        setSummaries([]);
+        setActiveId(null);
         const controller = new AbortController();
 
         fetch(`/api/recordings/${recordingId}/summary`, {
@@ -386,13 +388,24 @@ export function SummaryTabs({ recordingId, fetchKey = 0 }: SummaryTabsProps) {
                                 promptConfig,
                             );
                             return (
-                                <button
+                                <div
                                     key={summary.id}
-                                    type="button"
+                                    role="tab"
+                                    aria-selected={isActive}
+                                    tabIndex={0}
                                     onClick={() => setActiveId(summary.id)}
+                                    onKeyDown={(e) => {
+                                        if (
+                                            e.key === "Enter" ||
+                                            e.key === " "
+                                        ) {
+                                            e.preventDefault();
+                                            setActiveId(summary.id);
+                                        }
+                                    }}
                                     className={`
                                     flex items-center gap-2 px-3 py-1.5 rounded-md text-sm
-                                    transition-colors whitespace-nowrap shrink-0
+                                    transition-colors whitespace-nowrap shrink-0 cursor-pointer
                                     ${
                                         isActive
                                             ? "bg-primary text-primary-foreground"
@@ -415,6 +428,7 @@ export function SummaryTabs({ recordingId, fetchKey = 0 }: SummaryTabsProps) {
                                     {summaries.length > 1 && (
                                         <button
                                             type="button"
+                                            aria-label="Delete summary"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 handleDelete(summary.id);
@@ -425,7 +439,7 @@ export function SummaryTabs({ recordingId, fetchKey = 0 }: SummaryTabsProps) {
                                             <X className="w-3 h-3" />
                                         </button>
                                     )}
-                                </button>
+                                </div>
                             );
                         })}
                     </div>
@@ -524,8 +538,8 @@ export function SummaryTabs({ recordingId, fetchKey = 0 }: SummaryTabsProps) {
                                             </h4>
                                             <ul className="space-y-1">
                                                 {activeSummary.keyPoints.map(
-                                                    (point) => {
-                                                        const key = `kp-${point.slice(0, 32)}`;
+                                                    (point, index) => {
+                                                        const key = `kp-${index}`;
                                                         return (
                                                             <li
                                                                 key={key}
@@ -549,8 +563,8 @@ export function SummaryTabs({ recordingId, fetchKey = 0 }: SummaryTabsProps) {
                                             </h4>
                                             <ul className="space-y-1">
                                                 {activeSummary.actionItems.map(
-                                                    (item) => {
-                                                        const key = `ai-${item.slice(0, 32)}`;
+                                                    (item, index) => {
+                                                        const key = `ai-${index}`;
                                                         return (
                                                             <li
                                                                 key={key}

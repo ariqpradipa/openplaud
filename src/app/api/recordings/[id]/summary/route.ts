@@ -214,11 +214,20 @@ export const POST = apiHandler<IdContext>(async (request, context) => {
         );
     }
 
+    if (recording.deletedAt) {
+        throw new AppError(ErrorCode.NOT_FOUND, "Recording was deleted", 410);
+    }
+
     // Get transcription text
     const [transcription] = await db
         .select()
         .from(transcriptions)
-        .where(eq(transcriptions.recordingId, id))
+        .where(
+            and(
+                eq(transcriptions.recordingId, id),
+                eq(transcriptions.userId, session.user.id),
+            ),
+        )
         .limit(1);
 
     if (!transcription) {
