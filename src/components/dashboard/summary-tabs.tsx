@@ -132,6 +132,7 @@ export function SummaryTabs({ recordingId, fetchKey = 0 }: SummaryTabsProps) {
     }, []);
 
     const handleGenerateNew = useCallback(async () => {
+        setModalOpen(false);
         setIsGenerating(true);
         try {
             const response = await fetch(
@@ -157,7 +158,6 @@ export function SummaryTabs({ recordingId, fetchKey = 0 }: SummaryTabsProps) {
                 };
                 setSummaries((prev) => [...prev, newSummary]);
                 setActiveId(newSummary.id);
-                setModalOpen(false);
                 toast.success("Summary generated");
             } else {
                 const error = await response.json();
@@ -342,12 +342,21 @@ export function SummaryTabs({ recordingId, fetchKey = 0 }: SummaryTabsProps) {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                        <ListChecks className="w-10 h-10 text-muted-foreground mb-3" />
-                        <p className="text-sm text-muted-foreground">
-                            No summary yet. Click Summarize to generate one.
-                        </p>
-                    </div>
+                    {isGenerating ? (
+                        <div className="flex flex-col items-center justify-center py-8">
+                            <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+                            <p className="text-sm text-muted-foreground">
+                                Generating summary...
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-8 text-center">
+                            <ListChecks className="w-10 h-10 text-muted-foreground mb-3" />
+                            <p className="text-sm text-muted-foreground">
+                                No summary yet. Click Summarize to generate one.
+                            </p>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         );
@@ -433,7 +442,15 @@ export function SummaryTabs({ recordingId, fetchKey = 0 }: SummaryTabsProps) {
             </CardHeader>
 
             <CardContent>
-                {activeSummary && (
+                {isGenerating && (
+                    <div className="flex flex-col items-center justify-center py-8">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+                        <p className="text-sm text-muted-foreground">
+                            Generating new summary...
+                        </p>
+                    </div>
+                )}
+                {!isGenerating && activeSummary && (
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
                             <Button
@@ -600,25 +617,12 @@ export function SummaryTabs({ recordingId, fetchKey = 0 }: SummaryTabsProps) {
                         <Button
                             variant="outline"
                             onClick={() => setModalOpen(false)}
-                            disabled={isGenerating}
                         >
                             Cancel
                         </Button>
-                        <Button
-                            onClick={handleGenerateNew}
-                            disabled={isGenerating}
-                        >
-                            {isGenerating ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Generating...
-                                </>
-                            ) : (
-                                <>
-                                    <Sparkles className="w-4 h-4 mr-2" />
-                                    Generate
-                                </>
-                            )}
+                        <Button onClick={handleGenerateNew}>
+                            <Sparkles className="w-4 h-4 mr-2" />
+                            Generate
                         </Button>
                     </DialogFooter>
                 </DialogContent>
