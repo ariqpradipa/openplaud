@@ -89,7 +89,6 @@ export function SummaryTabs({ recordingId, fetchKey = 0 }: SummaryTabsProps) {
     useEffect(() => {
         setIsLoading(true);
         setSummaries([]);
-        setActiveId(null);
         const controller = new AbortController();
 
         fetch(`/api/recordings/${recordingId}/summary`, {
