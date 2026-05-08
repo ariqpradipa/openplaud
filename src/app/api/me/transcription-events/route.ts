@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { recordings, transcriptions } from "@/db/schema";
@@ -26,8 +26,10 @@ export async function GET(request: Request) {
             eq(transcriptions.recordingId, recordings.id),
         )
         .where(
-            eq(transcriptions.userId, session.user.id),
-            eq(transcriptions.status, "completed"),
+            and(
+                eq(transcriptions.userId, session.user.id),
+                eq(transcriptions.status, "completed"),
+            ),
         );
 
     return NextResponse.json({
