@@ -11,11 +11,11 @@ import { decrypt } from "@/lib/encryption";
 import { env } from "@/lib/env";
 import { createUserStorageProvider } from "@/lib/storage/factory";
 import { register, unregister } from "@/lib/transcription/abort-registry";
-import { postProcessTranscription } from "@/lib/transcription/transcribe-recording";
 import {
     getResponseFormat,
     parseTranscriptionResponse,
 } from "@/lib/transcription/format";
+import { postProcessTranscription } from "@/lib/transcription/transcribe-recording";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -443,11 +443,7 @@ async function processJob(job: ClaimedJob): Promise<void> {
 
         unregister(recordingId);
 
-        await postProcessTranscription(
-            userId,
-            recordingId,
-            transcriptionText,
-        );
+        await postProcessTranscription(userId, recordingId, transcriptionText);
 
         console.log(
             `[TranscriptionWorker] Completed job ${transcriptionId} for recording ${recordingId}`,

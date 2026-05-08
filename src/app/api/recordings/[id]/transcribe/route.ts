@@ -86,8 +86,8 @@ export async function POST(
             model: "",
         });
 
-        import("@/lib/transcription/worker").then(
-            ({ ensureWorkerStarted }) => ensureWorkerStarted(),
+        import("@/lib/transcription/worker").then(({ ensureWorkerStarted }) =>
+            ensureWorkerStarted(),
         );
 
         return NextResponse.json({ status: "pending" }, { status: 202 });

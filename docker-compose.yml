@@ -1,18 +1,15 @@
-version: '3.8'
+version: "3.8"
 
 services:
   db:
     image: postgres:16-alpine
     container_name: openplaud-db
     restart: unless-stopped
+    networks:
+      - openplaud
     environment:
       POSTGRES_USER: postgres
-      # Default preserved for backward compat with existing self-host
-      # deploys. The one-line installer (scripts/install.sh) generates a
-      # random POSTGRES_PASSWORD and writes it to .env. Existing operators
-      # can rotate by setting POSTGRES_PASSWORD in .env, recreating the
-      # `db` volume, and restoring from a backup.
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: openplaud
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -30,14 +27,18 @@ services:
     #   - `0.1.0`   → pin to a specific version
     #   - `dev`     → rolling build from `main` (unstable, opt-in)
     # Override via OPENPLAUD_VERSION in .env. For local builds, see docker-compose.dev.yml.
-    image: ghcr.io/openplaud/openplaud:${OPENPLAUD_VERSION:-latest}
+    image: ghcr.io/ariqpradipa/openplaud:devx
     container_name: openplaud-app
     restart: unless-stopped
+    mem_limit: 2g
+    networks:
+      - openplaud
     ports:
       - "3000:3000"
     environment:
+      NODE_OPTIONS: "--max-old-space-size=1536"
       # Database
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/openplaud
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/openplaud
 
       # Auth
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
@@ -60,7 +61,13 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})",
+        ]
       interval: 30s
       timeout: 3s
       start_period: 30s
@@ -71,3 +78,7 @@ volumes:
     driver: local
   audio:
     driver: local
+
+networks:
+  openplaud:
+    driver: bridge

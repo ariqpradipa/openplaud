@@ -6,9 +6,9 @@ vi.mock("@/db", () => {
         insert: vi.fn(),
         update: vi.fn(),
     };
-    db.transaction = vi.fn().mockImplementation(
-        (cb: (tx: unknown) => Promise<unknown>) => cb(db),
-    );
+    db.transaction = vi
+        .fn()
+        .mockImplementation((cb: (tx: unknown) => Promise<unknown>) => cb(db));
     return { db };
 });
 
@@ -106,7 +106,10 @@ describe("Transcription", () => {
                     from: vi.fn().mockReturnValue({
                         where: vi.fn().mockReturnValue({
                             limit: vi.fn().mockResolvedValue([
-                                { provider: "openai", defaultModel: "whisper-1" },
+                                {
+                                    provider: "openai",
+                                    defaultModel: "whisper-1",
+                                },
                             ]),
                         }),
                     }),
@@ -127,9 +130,11 @@ describe("Transcription", () => {
                 .mockReturnValueOnce({
                     from: vi.fn().mockReturnValue({
                         where: vi.fn().mockReturnValue({
-                            limit: vi.fn().mockResolvedValue([
-                                { id: mockRecordingId, deletedAt: null },
-                            ]),
+                            limit: vi
+                                .fn()
+                                .mockResolvedValue([
+                                    { id: mockRecordingId, deletedAt: null },
+                                ]),
                         }),
                     }),
                 })

@@ -23,9 +23,7 @@ export function TranscriptionNotifications() {
     useEffect(() => {
         const poll = async () => {
             try {
-                const since = new Date(
-                    lastPollTimeRef.current,
-                ).toISOString();
+                const since = new Date(lastPollTimeRef.current).toISOString();
                 const res = await fetch(
                     `/api/me/transcription-events?since=${encodeURIComponent(since)}`,
                     { cache: "no-store" },
@@ -48,9 +46,7 @@ export function TranscriptionNotifications() {
                 }
 
                 for (const event of events) {
-                    toast.success(
-                        `Transcription complete: ${event.filename}`,
-                    );
+                    toast.success(`Transcription complete: ${event.filename}`);
 
                     if (hasPermissionRef.current) {
                         showTranscriptionCompleteNotification(

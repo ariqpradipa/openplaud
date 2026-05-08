@@ -17,7 +17,9 @@ export async function GET(request: Request) {
     // Default: last 60s to catch recent completions on first poll.
     const url = new URL(request.url);
     const sinceParam = url.searchParams.get("since");
-    const since = sinceParam ? new Date(sinceParam) : new Date(Date.now() - 60000);
+    const since = sinceParam
+        ? new Date(sinceParam)
+        : new Date(Date.now() - 60000);
 
     const conditions = [
         eq(transcriptions.userId, session.user.id),
@@ -33,10 +35,7 @@ export async function GET(request: Request) {
             text: transcriptions.text,
         })
         .from(transcriptions)
-        .innerJoin(
-            recordings,
-            eq(transcriptions.recordingId, recordings.id),
-        )
+        .innerJoin(recordings, eq(transcriptions.recordingId, recordings.id))
         .where(and(...conditions));
 
     return NextResponse.json({
