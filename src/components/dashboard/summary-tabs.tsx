@@ -362,19 +362,26 @@ export function SummaryTabs({ recordingId, fetchKey = 0 }: SummaryTabsProps) {
                         Summaries
                     </CardTitle>
                 </div>
-                <div className="flex items-center gap-2 mt-3 overflow-x-auto pb-1">
-                    {summaries.map((summary) => {
-                        const isActive = summary.id === activeId;
-                        const name = getPresetName(
-                            summary.presetId,
-                            promptConfig,
-                        );
-                        return (
-                            <button
-                                key={summary.id}
-                                type="button"
-                                onClick={() => setActiveId(summary.id)}
-                                className={`
+                <div className="flex items-center gap-2 mt-3">
+                    <div
+                        className="flex items-center gap-2 overflow-x-auto pb-1 flex-1 [&::-webkit-scrollbar]:hidden"
+                        style={{
+                            scrollbarWidth: "none",
+                            msOverflowStyle: "none",
+                        }}
+                    >
+                        {summaries.map((summary) => {
+                            const isActive = summary.id === activeId;
+                            const name = getPresetName(
+                                summary.presetId,
+                                promptConfig,
+                            );
+                            return (
+                                <button
+                                    key={summary.id}
+                                    type="button"
+                                    onClick={() => setActiveId(summary.id)}
+                                    className={`
                                     flex items-center gap-2 px-3 py-1.5 rounded-md text-sm
                                     transition-colors whitespace-nowrap shrink-0
                                     ${
@@ -383,35 +390,36 @@ export function SummaryTabs({ recordingId, fetchKey = 0 }: SummaryTabsProps) {
                                             : "bg-muted hover:bg-muted/80 text-muted-foreground"
                                     }
                                 `}
-                            >
-                                <span>{name}</span>
-                                <span
-                                    className={`text-xs opacity-60 ${
-                                        isActive
-                                            ? "text-primary-foreground"
-                                            : ""
-                                    }`}
                                 >
-                                    {new Date(
-                                        summary.createdAt,
-                                    ).toLocaleDateString()}
-                                </span>
-                                {summaries.length > 1 && (
-                                    <button
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDelete(summary.id);
-                                        }}
-                                        className="ml-1 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 opacity-60 hover:opacity-100 transition-opacity"
-                                        disabled={isDeleting}
+                                    <span>{name}</span>
+                                    <span
+                                        className={`text-xs opacity-60 ${
+                                            isActive
+                                                ? "text-primary-foreground"
+                                                : ""
+                                        }`}
                                     >
-                                        <X className="w-3 h-3" />
-                                    </button>
-                                )}
-                            </button>
-                        );
-                    })}
+                                        {new Date(
+                                            summary.createdAt,
+                                        ).toLocaleDateString()}
+                                    </span>
+                                    {summaries.length > 1 && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDelete(summary.id);
+                                            }}
+                                            className="ml-1 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 opacity-60 hover:opacity-100 transition-opacity"
+                                            disabled={isDeleting}
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
                     <Button
                         variant="outline"
                         size="sm"
