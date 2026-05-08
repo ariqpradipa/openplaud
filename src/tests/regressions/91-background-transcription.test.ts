@@ -86,10 +86,7 @@ vi.mock("@/lib/plaud/client-factory", () => ({
 }));
 
 import { db } from "@/db";
-import {
-    recordings as recordingsTable,
-    transcriptions as transcriptionsTable,
-} from "@/db/schema";
+import { transcriptions as transcriptionsTable } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { abort as abortRegistry } from "@/lib/transcription/abort-registry";
 
@@ -380,8 +377,8 @@ describe("Worker failure path", () => {
             | Record<string, unknown>
             | undefined;
         expect(callArg).toBeDefined();
-        expect(callArg!.lockedAt).toBeNull();
-        expect(callArg!.status).toBe("failed");
+        expect(callArg?.lockedAt).toBeNull();
+        expect(callArg?.status).toBe("failed");
     });
 });
 
@@ -448,8 +445,8 @@ describe("Startup recovery logic", () => {
             | Record<string, unknown>
             | undefined;
         expect(callArg).toBeDefined();
-        expect(callArg!.errorMessage).toBeDefined();
-        expect(callArg!.lockedAt).toBeNull();
+        expect(callArg?.errorMessage).toBeDefined();
+        expect(callArg?.lockedAt).toBeNull();
     });
 });
 
